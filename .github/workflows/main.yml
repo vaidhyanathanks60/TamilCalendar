@@ -1,14 +1,14 @@
-name: Daily Telegram Tamil Calendar
+name: Daily Tamil Calendar → Telegram
 
 on:
   schedule:
-    - cron: "01 0 * * *"   # 6:00 AM IST every day
+    - cron: "30 0 * * *"   # 6:00 AM IST
   workflow_dispatch:
 
 jobs:
-  send-telegram:
+  send_cal:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v3
 
@@ -17,10 +17,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install requests
         run: pip install requests
 
-      - name: Send Telegram Message
+      - name: Send Calendar to Telegram
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
