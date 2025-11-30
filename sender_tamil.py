@@ -3,103 +3,91 @@ import os
 import requests
 from datetime import datetime, timezone, timedelta
 
-# ----- IST TIME -----
+# Timezone for IST
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# ----- ENV VARIABLES -----
 BOT_TOKEN = os.getenv("8587330162")
-CHAT_ID = os.getenv("TamilCalendars")          # Channel ID or @channelusername
+CHAT_ID = os.getenv("@TamilCalendars")      # e.g. "-1001234567890" or "@YourChannelName"
+IMAGE_URL = os.getenv("IMAGE_URL", "")  # optional
 
+RAW_JSON_URL = "https://github.com/vaidhyanathanks60/TamilCalendar/blob/main/combined.json"
 
-if not BOT_TOKEN or not CHAT_ID:
-    raise Exception("BOT_TOKEN or CHAT_ID not set in environment variables.")
+def fetch_calendar():
+    resp = requests.get(RAW_JSON_URL)
+    resp.raise_for_status()
+    return resp.json()
 
-API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
-
-MONTH_TA = {
-    "Jan": "ஜனவரி", "Feb": "பிப்ரவரி", "Mar": "மார்ச்", "Apr": "ஏப்ரல்",
-    "May": "மே", "Jun": "ஜூன்", "Jul": "ஜூலை", "Aug": "ஆகஸ்ட்",
-    "Sep": "செப்டம்பர்", "Oct": "அக்டோபர்", "Nov": "நவம்பர்", "Dec": "டிசம்பர்"
-}
-
-def tamil_date(date_str):
-    d, m, y = date_str.split()
+def to_tamil_date(dstr):
+    MONTH_TA = {
+        "Jan":"ஜனவரி","Feb":"பிப்ரவரி","Mar":"மார்ச்","Apr":"ஏப்ரல்",
+        "May":"மே","Jun":"ஜூன்","Jul":"ஜூலை","Aug":"ஆகஸ்ட்",
+        "Sep":"செப்டம்பர்","Oct":"அக்டோபர்","Nov":"நவம்பர்","Dec":"டிசம்பர்"
+    }
+    d, m, y = dstr.split()
     return f"{d} {MONTH_TA.get(m, m)} {y}"
 
-def load_today():
-    today_ist = datetime.now(IST)
-    key = today_ist.strftime("%d %b %Y")
+def build_message(entry):
+    msg = f"📅 *{to_tamil_date(entry['திகதி'])} — தமிழ் நாள்காட்டி*  \n\n"
+    msg += f"🌅 சூரிய உதயம்: {entry.get('சூரிய உதயம்','—')}  \n"
+    msg += f"🌇 சூரிய அஸ்தமனம்: {entry.get('சூரிய அஸ்தமனம்','—')}  \n"
+    msg += f"🕒 நாள் நீளம்: {entry.get('நாள் நீளம்','—')}  \n\n"
 
-    with open("combined.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
+    msg += f"📌 மாசம்: {entry.get('மாசம்','—')}  \n"
+    msg += f"📌 பக்ஷம்: {entry.get('பக்ஷம்','—')}  \n"
+    msg += f"📌 ராசி (சூரியன்): {entry.get('ராசி','—')}  \n"
+    msg += f"📌 சந்திர ராசி: {entry.get('சந்திரராசி','—')}  \n\n"
 
-    for entry in data:
-        if entry.get("திகதி") == key:
-            return entry
+    msg += "🕉 திதி / ✨ நட்சத்திரம் / 🧘 யோகம் / 🔥 கரணம்:  \n"
+    for r in entry.get("திதி/நட்சத்திரம்/யோகம்/கரணம்", []):
+        msg += f" • {r.get('நேரம்')} – {r.get('திதி')} | {r.get('நட்சத்திரம்')} | {r.get('யோகம்')} | {r.get('கரணம்')}  \n"
 
-    return None
+    msg += f"\n⛔ ராகு காலம்: {entry.get('ராகு காலம்','—')}  \n"
+    msg += f"⚠️ யமகண்டம்: {entry.get('யமகண்ட','—')}  \n"
+    msg += f"🕑 கூலிகை: {entry.get('கூலிகை','—')}  \n"
+    msg += f"✨ அப்ஜித் முகூர்த்தம்: {entry.get('அப்ஜித் முகூர்த்தம்','—')}  \n\n"
 
-def build_message(e):
-    # Create Tamil Panchang message
-    msg = f"📅 *{tamil_date(e['திகதி'])} — தமிழ் நாள்காட்டி*\n\n"
-    msg += f"🌅 சூரிய உதயம்: {e['சூரிய உதயம்']}\n"
-    msg += f"🌇 சூரிய அஸ்தமனம்: {e['சூரிய அஸ்தமனம்']}\n"
-    msg += f"🕒 நாள் நீளம்: {e['நாள் நீளம்']}\n\n"
-
-    msg += f"📌 மாசம்: {e['மாசம்']}\n"
-    msg += f"📌 பக்ஷம்: {e['பக்ஷம்']}\n"
-    msg += f"📌 ராசி (சூரியன்): {e['ராசி']}\n"
-    msg += f"📌 சந்திர ராசி: {e['சந்திரராசி']}\n\n"
-
-    msg += "🕉 திதி / ✨ நட்சத்திரம் / 🧘 யோகம் / 🔥 கரணம்:\n"
-    for r in e["திதி/நட்சத்திரம்/யோகம்/கரணம்"]:
-        msg += f" • {r['நேரம்']} – {r['திதி']} | {r['நட்சத்திரம்']} | {r['யோகம்']} | {r['கரணம்']}\n"
-
-    msg += f"\n⛔ ராகு காலம்: {e['ராகு காலம்']}\n"
-    msg += f"⚠️ யமகண்டம்: {e['யமகண்ட']}\n"
-    msg += f"🕑 கூலிகை: {e['கூலிகை']}\n"
-    msg += f"✨ அப்ஜித் முகூர்த்தம்: {e['அப்ஜித் முகூர்த்தம்']}\n\n"
-
-    msg += "🎉 சிறப்பு நாள் / பண்டிகைகள்:\n"
-    for f in e["சிறப்பு நாள்/பண்டிகைகள்"]:
-        msg += f" • {f}\n"
+    msg += "🎉 சிறப்பு நாள்/பண்டிகைகள்:  \n"
+    for f in entry.get("சிறப்பு நாள்/பண்டிகைகள்", []):
+        msg += f" • {f}  \n"
 
     return msg
 
-def send_message(text):
-    url = f"{API_URL}/sendMessage"
+def send_to_telegram(text):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": CHAT_ID,
         "text": text,
         "parse_mode": "Markdown"
     }
-    r = requests.post(url, json=payload)
-    print("Message sent:", r.text)
+    resp = requests.post(url, json=payload)
+    resp.raise_for_status()
+    print("Sent message:", resp.json())
 
-def send_image(img_url, caption):
-    url = f"{API_URL}/sendPhoto"
+def send_photo_with_caption(img_url, caption):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
     payload = {
         "chat_id": CHAT_ID,
         "photo": img_url,
         "caption": caption,
         "parse_mode": "Markdown"
     }
-    r = requests.post(url, json=payload)
-    print("Image sent:", r.text)
+    resp = requests.post(url, json=payload)
+    resp.raise_for_status()
+    print("Sent photo:", resp.json())
 
 def main():
-    entry = load_today()
+    calendar = fetch_calendar()
+    today = datetime.now(IST).strftime("%d %b %Y")
+    entry = next((e for e in calendar if e.get("திகதி")==today), None)
     if not entry:
-        print("No entry for today.")
+        print("No data for today:", today)
         return
 
     msg = build_message(entry)
-
     if IMAGE_URL:
-        send_image(IMAGE_URL, msg)
+        send_photo_with_caption(IMAGE_URL, msg)
     else:
-        send_message(msg)
+        send_to_telegram(msg)
 
 if __name__ == "__main__":
     main()
-
