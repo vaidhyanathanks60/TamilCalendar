@@ -2,7 +2,7 @@ name: Daily Tamil Calendar → Telegram
 
 on:
   schedule:
-    - cron: "30 0 * * *"   # 6:00 AM IST
+    - cron: "* * * * *"   # 6:00 AM IST
   workflow_dispatch:
 
 jobs:
