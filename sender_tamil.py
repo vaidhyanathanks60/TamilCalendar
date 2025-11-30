@@ -1,21 +1,20 @@
 import json
 import os
-from datetime import datetime, timedelta, timezone
 import requests
+from datetime import datetime, timezone, timedelta
 
-# ---------- IST TIME ----------
+# ----- IST TIME -----
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# ---------- ENV SECRETS ----------
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
-PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+# ----- ENV VARIABLES -----
+BOT_TOKEN = os.getenv("8587330162")
+CHAT_ID = os.getenv("TamilCalendars")          # Channel ID or @channelusername
+IMAGE_URL = os.getenv("IMAGE_URL", "") # optional
 
-# Comma-separated numbers: "91XXXXXXXXXX,91YYYYYYYYYY"
-RECIPIENTS = os.getenv("RECIPIENT_NUMBERS", "")
-RECIPIENTS = [x.strip() for x in RECIPIENTS.split(",") if x.strip()]
+if not BOT_TOKEN or not CHAT_ID:
+    raise Exception("BOT_TOKEN or CHAT_ID not set in environment variables.")
 
-if not RECIPIENTS:
-    raise Exception("RECIPIENT_NUMBERS secret not configured.")
+API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 MONTH_TA = {
     "Jan": "ஜனவரி", "Feb": "பிப்ரவரி", "Mar": "மார்ச்", "Apr": "ஏப்ரல்",
@@ -38,67 +37,68 @@ def load_today():
         if entry.get("திகதி") == key:
             return entry
 
-    print("⚠️ No data for:", key)
     return None
 
 def build_message(e):
+    # Create Tamil Panchang message
+    msg = f"📅 *{tamil_date(e['திகதி'])} — தமிழ் நாள்காட்டி*\n\n"
+    msg += f"🌅 சூரிய உதயம்: {e['சூரிய உதயம்']}\n"
+    msg += f"🌇 சூரிய அஸ்தமனம்: {e['சூரிய அஸ்தமனம்']}\n"
+    msg += f"🕒 நாள் நீளம்: {e['நாள் நீளம்']}\n\n"
 
-    block = "\n".join(
-        f" • {r['நேரம்']} – திதி: {r['திதி']} | நட்சத்திரம்: {r['நட்சத்திரம்']} | யோகம்: {r['யோகம்']} | கரணம்: {r['கரணம்']}"
-        for r in e.get("திதி/நட்சத்திரம்/யோகம்/கரணம்", [])
-    )
+    msg += f"📌 மாசம்: {e['மாசம்']}\n"
+    msg += f"📌 பக்ஷம்: {e['பக்ஷம்']}\n"
+    msg += f"📌 ராசி (சூரியன்): {e['ராசி']}\n"
+    msg += f"📌 சந்திர ராசி: {e['சந்திரராசி']}\n\n"
 
-    festivals = "\n".join(f" • {f}" for f in e.get("சிறப்பு நாள்/பண்டிகைகள்", [])) or " • இல்லை"
+    msg += "🕉 திதி / ✨ நட்சத்திரம் / 🧘 யோகம் / 🔥 கரணம்:\n"
+    for r in e["திதி/நட்சத்திரம்/யோகம்/கரணம்"]:
+        msg += f" • {r['நேரம்']} – {r['திதி']} | {r['நட்சத்திரம்']} | {r['யோகம்']} | {r['கரணம்']}\n"
 
-    return f"""
-📅 *{tamil_date(e['திகதி'])} — தமிழ் நாள்காட்டி*
+    msg += f"\n⛔ ராகு காலம்: {e['ராகு காலம்']}\n"
+    msg += f"⚠️ யமகண்டம்: {e['யமகண்ட']}\n"
+    msg += f"🕑 கூலிகை: {e['கூலிகை']}\n"
+    msg += f"✨ அப்ஜித் முகூர்த்தம்: {e['அப்ஜித் முகூர்த்தம்']}\n\n"
 
-🌅 சூரிய உதயம்: {e.get('சூரிய உதயம்')}
-🌇 சூரிய அஸ்தமனம்: {e.get('சூரிய அஸ்தமனம்')}
-🕒 நாள் நீளம்: {e.get('நாள் நீளம்')}
+    msg += "🎉 சிறப்பு நாள் / பண்டிகைகள்:\n"
+    for f in e["சிறப்பு நாள்/பண்டிகைகள்"]:
+        msg += f" • {f}\n"
 
-📌 மாசம்: {e.get('மாசம்')}
-📌 பக்ஷம்: {e.get('பக்ஷம்')}
-📌 ராசி (சூரியன்): {e.get('ராசி')}
-📌 சந்திர ராசி: {e.get('சந்திரராசி')}
+    return msg
 
-🕉 திதி / ✨ நட்சத்திரம் / 🧘 யோகம் / 🔥 கரணம்:
-{block}
-
-⛔ ராகு காலம்: {e.get('ராகு காலம்')}
-⚠️ யமகண்டம்: {e.get('யமகண்ட')}
-🕑 கூலிகை: {e.get('கூலிகை')}
-✨ அப்ஜித் முகூர்த்தம்: {e.get('அப்ஜித் முகூர்த்தம்')}
-
-🎉 சிறப்பு நாள் / பண்டிகைகள்:
-{festivals}
-"""
-
-def send(msg):
-    url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
-        "Content-Type": "application/json"
+def send_message(text):
+    url = f"{API_URL}/sendMessage"
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": text,
+        "parse_mode": "Markdown"
     }
+    r = requests.post(url, json=payload)
+    print("Message sent:", r.text)
 
-    for number in RECIPIENTS:
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": f"whatsapp:{number}",
-            "type": "text",
-            "text": { "body": msg }
-        }
-
-        r = requests.post(url, headers=headers, json=payload)
-        print(f"{number} → {r.status_code} → {r.text}")
+def send_image(img_url, caption):
+    url = f"{API_URL}/sendPhoto"
+    payload = {
+        "chat_id": CHAT_ID,
+        "photo": img_url,
+        "caption": caption,
+        "parse_mode": "Markdown"
+    }
+    r = requests.post(url, json=payload)
+    print("Image sent:", r.text)
 
 def main():
     entry = load_today()
     if not entry:
+        print("No entry for today.")
         return
+
     msg = build_message(entry)
-    print(msg)
-    send(msg)
+
+    if IMAGE_URL:
+        send_image(IMAGE_URL, msg)
+    else:
+        send_message(msg)
 
 if __name__ == "__main__":
     main()
