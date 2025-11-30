@@ -25,4 +25,4 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
           IMAGE_URL: ${{ secrets.IMAGE_URL }}
-        run: python send_telegram.py
+        run: python sender_tamil.py
