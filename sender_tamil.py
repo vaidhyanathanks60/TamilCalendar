@@ -6,11 +6,11 @@ from datetime import datetime, timezone, timedelta
 # Timezone for IST
 IST = timezone(timedelta(hours=5, minutes=30))
 
-BOT_TOKEN = os.getenv("8587330162")
-CHAT_ID = os.getenv("@TamilCalendars")      # e.g. "-1001234567890" or "@YourChannelName"
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # set in environment / .env
+CHAT_ID = os.getenv("CHAT_ID", "@TamilCalendars")  # fallback to channel username
 IMAGE_URL = os.getenv("IMAGE_URL", "")  # optional
 
-RAW_JSON_URL = "https://github.com/vaidhyanathanks60/TamilCalendar/blob/main/combined.json"
+RAW_JSON_URL = "https://raw.githubusercontent.com/vaidhyanathanks60/TamilCalendar/main/combined.json"
 
 def fetch_calendar():
     resp = requests.get(RAW_JSON_URL)
@@ -60,8 +60,13 @@ def send_to_telegram(text):
         "parse_mode": "Markdown"
     }
     resp = requests.post(url, json=payload)
+
+    # DEBUG PRINT
+    print("STATUS:", resp.status_code)
+    print("RESPONSE:", resp.text)
+
     resp.raise_for_status()
-    print("Sent message:", resp.json())
+
 
 def send_photo_with_caption(img_url, caption):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
