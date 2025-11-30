@@ -1,0 +1,56 @@
+name: Build Tamil Calendar API
+
+on:
+  push:
+  schedule:
+    - cron: "0 * * * *"   # updates every hour
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Generate Calendar API
+        run: |
+          mkdir -p api/date
+
+          python3 - << 'EOF'
+          import json, os
+          from datetime import datetime
+
+          # load main json
+          with open("combined.json", encoding="utf-8") as f:
+              data = json.load(f)
+
+          # save full API
+          os.makedirs("api", exist_ok=True)
+          with open("api/full.json", "w", encoding="utf-8") as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+
+          # today's API
+          today_key = datetime.now().strftime("%d %b %Y")
+          today_entry = next((x for x in data if x["திகதி"] == today_key), {})
+          with open("api/today.json", "w", encoding="utf-8") as f:
+              json.dump(today_entry, f, ensure_ascii=False, indent=2)
+
+          # per date API
+          os.makedirs("api/date", exist_ok=True)
+          for e in data:
+              date_key = e["திகதி"].replace(" ", "-")
+              path = f"api/date/{date_key}.json"
+              with open(path, "w", encoding="utf-8") as f:
+                  json.dump(e, f, ensure_ascii=False, indent=2)
+
+          EOF
+
+      - name: Commit API files
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add api/
+          git commit -m "Updated Tamil Calendar API" || echo "No changes"
+          git push
