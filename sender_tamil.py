@@ -9,7 +9,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 # ----- ENV VARIABLES -----
 BOT_TOKEN = os.getenv("8587330162")
 CHAT_ID = os.getenv("TamilCalendars")          # Channel ID or @channelusername
-IMAGE_URL = os.getenv("IMAGE_URL", "") # optional
+
 
 if not BOT_TOKEN or not CHAT_ID:
     raise Exception("BOT_TOKEN or CHAT_ID not set in environment variables.")
@@ -102,3 +102,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
