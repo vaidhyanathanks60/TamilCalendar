@@ -5,7 +5,6 @@ import os
 import json
 import requests
 from datetime import datetime, timedelta, timezone
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 # ---------------- CONFIG ----------------
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -28,7 +27,7 @@ def normalize(val):
 def to_tamil_date(dstr: str) -> str:
     MONTH_TA = {
         "Jan":"ஜனவரி","Feb":"பிப்ரவரி","Mar":"மார்ச்","Apr":"ஏப்ரல்",
-        "May":"மே","Jun":"ஜூன்","Jul":"ஜூலை","Aug":"ஆகஸ்ட்",
+        "May":"மே","Jun":"ஜூன்","Jul":"ஜூன்","Aug":"ஆகஸ்ட்",
         "Sep":"செப்டம்பர்","Oct":"அக்டோபர்","Nov":"நவம்பர்","Dec":"டிசம்பர்"
     }
     try:
@@ -46,6 +45,7 @@ def build_caption(entry):
 
     caption = f"📅 *{to_tamil_date(entry.get('திகதி',''))} — தமிழ் நாட்காட்டி*\n"
 
+    # Sunrise / Sunset
     if clean(entry.get("சூரிய உதயம்")):
         caption += f"🌅 சூரிய உதயம்: {entry['சூரிய உதயம்']}\n"
     if clean(entry.get("சூரிய அஸ்தமனம்")):
@@ -53,6 +53,7 @@ def build_caption(entry):
 
     caption += "\n"
 
+    # Panchangam core
     if clean(entry.get("நாள்")):
         caption += f"📌 நாள்: {entry['நாள்']}\n"
     if clean(entry.get("பக்ஷம்")):
@@ -60,20 +61,23 @@ def build_caption(entry):
     if clean(entry.get("சந்திரராசி")):
         caption += f"📌 சந்திர ராசி: {entry['சந்திரராசி']}\n"
 
+    # Good time
     nn = entry.get("நல்ல நேரம்", [])
     nn = [clean(n) for n in nn if clean(n)]
     if nn:
         caption += "\n📌 நல்ல நேரம்:\n"
         for n in nn:
-            caption += f"   {n}\n"
+            caption += f"   {n}\n\n"
 
+    # Tithi / Nakshatra / Yogam
     tithi = clean(entry.get("திதி"))
     nak = clean(entry.get("நட்சத்திரம்"))
     yog = clean(entry.get("யோகம்"))
 
     if tithi or nak or yog:
+  
         if tithi:
-            caption += f"\n🕉 திதி: {tithi}\n\n"
+            caption += f"🕉 திதி: {tithi}\n\n"
         if nak:
             caption += f"🕉 நட்சத்திரம்: {nak}\n\n"
         if yog:
@@ -81,10 +85,12 @@ def build_caption(entry):
 
     caption += "\n"
 
+    # Rahu / Yamagandam / Kuligai
     caption += f"⛔ ராகு காலம்: {clean(entry.get('ராகு காலம்')) or '—'}\n"
     caption += f"⚠️ யமகண்டம்: {clean(entry.get('யமகண்டம்')) or '—'}\n"
     caption += f"🕑 குளிகை: {clean(entry.get('குளிகை')) or '—'}\n"
 
+    # Notes
     notes = [clean(n) for n in entry.get("சிறப்பு குறிப்புகள்", []) if clean(n)]
     if notes:
         caption += "\n🎉 சிறப்பு குறிப்புகள்:\n"
@@ -93,62 +99,7 @@ def build_caption(entry):
 
     return caption
 
-
-# ---------------- IMAGE GENERATOR (LATHA) ----------------
-
-def create_image(entry, out_path="calendar.png"):
-
-    W, H = 1500, 3000
-    img = Image.new("RGB", (W, H), (15, 10, 40))
-    draw = ImageDraw.Draw(img)
-
-    # Background gradient
-    for y in range(H):
-        r = int(30 + (y / H) * 70)
-        g = int(0 + (y / H) * 20)
-        b = int(70 + (y / H) * 160)
-        draw.line([(0, y), (W, y)], fill=(r, g, b))
-
-    # Load Latha font
-    FONT_PATH = os.path.join(os.path.dirname(__file__), "Latha.ttf")
-
-    title_font = ImageFont.truetype(FONT_PATH, 150)
-    header_font = ImageFont.truetype(FONT_PATH, 90)
-    text_font = ImageFont.truetype(FONT_PATH, 75)
-
-    # Title
-    tamil_date = to_tamil_date(entry["திகதி"])
-    x, y = 120, 160
-    draw.text((x, y), tamil_date, font=title_font, fill="white")
-    y += 220
-
-    # Caption lines
-    caption = build_caption(entry).replace("*", "")
-    lines = caption.split("\n")
-
-    for line in lines:
-        if not line.strip():
-            y += 40
-            continue
-
-        # Bold simulation for section headers
-        if line.startswith(("📅", "📌", "🕉", "⛔", "⚠️", "🕑", "🎉")):
-            font = header_font
-            # Fake stroke = simulate bold
-            draw.text((x-2, y), line, font=font, fill="white")
-            draw.text((x+2, y), line, font=font, fill="white")
-        else:
-            font = text_font
-
-        draw.text((x, y), line, font=font, fill="white")
-        y += font.size + 35
-
-    img.save(out_path)
-    return out_path
-
-
 # ---------------- FETCH JSON ----------------
-
 def fetch_calendar():
     try:
         resp = requests.get(RAW_JSON_URL, timeout=30)
@@ -158,25 +109,25 @@ def fetch_calendar():
         print("❌ Error fetching JSON:", e)
         return None
 
-
-# ---------------- SEND IMAGE ----------------
-
-def send_image_with_caption(image_path, caption):
+# ---------------- TELEGRAM SENDER ----------------
+def send_caption_only(caption):
     if BOT_TOKEN.startswith("YOUR_"):
-        print("❌ BOT_TOKEN not configured.")
+        print("❌ BOT_TOKEN not configured. Skipping send.")
         return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    data = {
+        "chat_id": CHAT_ID,
+        "text": caption,
+        "parse_mode": "Markdown"
+    }
+    try:
+        resp = requests.post(url, data=data, timeout=30)
+        resp.raise_for_status()
+        print("✅ Telegram send:", resp.text)
+    except Exception as e:
+        print("❌ Telegram send failed:", e)
 
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-
-    with open(image_path, "rb") as f:
-        files = {"photo": f}
-        data = {"chat_id": CHAT_ID, "caption": caption, "parse_mode": "Markdown"}
-        resp = requests.post(url, data=data, files=files)
-        print("Telegram response:", resp.text)
-
-
-# ---------------- MAIN ----------------
-
+# ---------------- MAIN (send tomorrow) ----------------
 def main():
     dataset = fetch_calendar()
     if not dataset:
@@ -187,14 +138,11 @@ def main():
 
     entry = next((e for e in dataset if e.get("திகதி") == target), None)
     if not entry:
-        print("❌ No entry for:", target)
+        print("❌ No entry found for", target)
         return
 
     caption = build_caption(entry)
-    img_path = create_image(entry)
-
-    send_image_with_caption(img_path, caption)
-
+    send_caption_only(caption)
 
 if __name__ == "__main__":
     main()
