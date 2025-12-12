@@ -16,6 +16,9 @@ VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "MySecretToken")
 
 app = Flask(__name__)
 
+@app.route("/")
+def home():
+    return "Tamil calendar API running successfully!"
 def normalize(val):
     if not val:
         return None
