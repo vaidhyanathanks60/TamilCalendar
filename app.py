@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import os
@@ -11,8 +10,9 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 RAW_JSON_URL = "https://raw.githubusercontent.com/vaidhyanathanks60/TamilCalendar/main/combined.json"
 
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "YOUR_WA_TOKEN")
-PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID", "YOUR_PHONE_NUMBER_ID")
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
+PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID", "")
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "MySecretToken")
 
 app = Flask(__name__)
 
@@ -26,9 +26,9 @@ def normalize(val):
 
 def to_tamil_date(dstr: str) -> str:
     MONTH_TA = {
-        "Jan":"ஜனவரி","Feb":"பிப்ரவரி","Mar":"மார்ச்","Apr":"ஏப்ரல்",
-        "May":"மே","Jun":"ஜூன்","Jul":"ஜூலை","Aug":"ஆகஸ்ட்",
-        "Sep":"செப்டம்பர்","Oct":"அக்டோபர்","Nov":"நவம்பர்","Dec":"டிசம்பர்"
+        "Jan": "ஜனவரி", "Feb": "பிப்ரவரி", "Mar": "மார்ச்", "Apr": "ஏப்ரல்",
+        "May": "மே", "Jun": "ஜூன்", "Jul": "ஜூலை", "Aug": "ஆகஸ்ட்",
+        "Sep": "செப்டம்பர்", "Oct": "அக்டோபர்", "Nov": "நவம்பர்", "Dec": "டிசம்பர்"
     }
     try:
         d, m, y = dstr.split()
@@ -41,70 +41,50 @@ def build_caption(entry):
         return normalize(v)
 
     caption = f"📅 *{to_tamil_date(entry.get('திகதி',''))} — தமிழ் நாட்காட்டி*\n"
-"
 
     if clean(entry.get("சூரிய உதயம்")):
         caption += f"🌅 சூரிய உதயம்: {entry['சூரிய உதயம்']}\n"
-"
     if clean(entry.get("சூரிய அஸ்தமனம்")):
         caption += f"🌇 சூரிய அஸ்தமனம்: {entry['சூரிய அஸ்தமனம்']}\n"
-"
 
     caption += "\n"
 
     if clean(entry.get("நாள்")):
         caption += f"📌 நாள்: {entry['நாள்']}\n"
-"
     if clean(entry.get("பக்ஷம்")):
         caption += f"📌 பக்ஷம்: {entry['பக்ஷம்']}\n"
-"
     if clean(entry.get("சந்திரராசி")):
         caption += f"📌 சந்திர ராசி: {entry['சந்திரராசி']}\n"
-"
 
     nn = entry.get("நல்ல நேரம்", [])
     nn = [clean(n) for n in nn if clean(n)]
     if nn:
         caption += "\n📌 நல்ல நேரம்:\n"
-"
         for n in nn:
             caption += f"   {n}\n"
-
-"
 
     tithi = clean(entry.get("திதி"))
     nak = clean(entry.get("நட்சத்திரம்"))
     yog = clean(entry.get("யோகம்"))
 
     if tithi:
-        caption += f"🕉 திதி: {tithi}\n"
-
-"
+        caption += f"\n🕉 திதி: {tithi}\n"
     if nak:
         caption += f"🕉 நட்சத்திரம்: {nak}\n"
-
-"
     if yog:
         caption += f"🕉 யோகம்: {yog}\n"
-
-"
 
     caption += "\n"
 
     caption += f"⛔ ராகு காலம்: {clean(entry.get('ராகு காலம்')) or '—'}\n"
-"
     caption += f"⚠️ யமகண்டம்: {clean(entry.get('யமகண்டம்')) or '—'}\n"
-"
     caption += f"🕑 குளிகை: {clean(entry.get('குளிகை')) or '—'}\n"
-"
 
     notes = [clean(n) for n in entry.get("சிறப்பு குறிப்புகள்", []) if clean(n)]
     if notes:
-        caption += "\n🎉 சிறப்பு குறிப்புகள்:
-"
+        caption += "\n🎉 சிறப்பு குறிப்புகள்:\n"
         for n in notes:
             caption += f"• {n}\n"
-"
 
     return caption
 
@@ -147,9 +127,9 @@ def get_entry_for(choice, dataset):
     return entry
 
 @app.route("/webhook", methods=["GET", "POST"])
-def whatsapp_webhook():
+def webhook():
     if request.method == "GET":
-        if request.args.get("hub.verify_token") == "MySecretToken":
+        if request.args.get("hub.verify_token") == VERIFY_TOKEN:
             return request.args.get("hub.challenge")
         return "Invalid token", 403
 
@@ -169,7 +149,7 @@ def whatsapp_webhook():
 
     if text not in ["today", "tomorrow", "yesterday"]:
         send_whatsapp_message(sender,
-            "Welcome! Type any option:\n\n• *Today*\n• *Tomorrow*\n• *Yesterday*"
+            "Welcome! Type:\n\n• Today\n• Tomorrow\n• Yesterday"
         )
         return "ok"
 
@@ -184,4 +164,4 @@ def whatsapp_webhook():
     return "ok"
 
 if __name__ == "__main__":
-    app.run(port=5000)
+    app.run(host="0.0.0.0", port=5000)
